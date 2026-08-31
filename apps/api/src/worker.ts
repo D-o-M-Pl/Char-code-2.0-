@@ -43,7 +43,7 @@ async function dispatch(event: any) {
       outboxEventId: event.id,
       userId: payload.userId ?? null,
       recipient: payload.email,
-      subject: "Char-code â€” reset hasĹ‚a",
+      subject: "Char-code ÔÇö reset has┼éa",
       body: `Token resetu: ${payload.token}`,
       status: "PENDING",
     },

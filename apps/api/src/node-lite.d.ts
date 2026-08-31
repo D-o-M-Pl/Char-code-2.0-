@@ -1,7 +1,11 @@
 // Copyright (c) 2026 D-o-M-Pl. All Rights Reserved.
 
-/**
- *
+declare const console: { log(...args: unknown[]): void; error(...args: unknown[]): void; };
+declare const process: {
+  env: Record<string, string | undefined>;
+  exitCode?: number;
+};
+
 declare module "node:http" {
   export interface IncomingMessage {
     method?: string;

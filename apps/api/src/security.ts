@@ -1,7 +1,7 @@
 // Copyright (c) 2026 D-o-M-Pl. All Rights Reserved.
 
-/**
- *
+import { createHash, randomBytes, scryptSync, timingSafeEqual } from "node:crypto";
+
 export function hash(value: string): string {
   return createHash("sha256").update(value).digest("hex");
 }

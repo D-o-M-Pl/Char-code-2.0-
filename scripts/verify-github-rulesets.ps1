@@ -1,4 +1,7 @@
-// Copyright (c) 2026 D-o-M-Pl. All Rights Reserved.
+# Copyright (c) 2026 D-o-M-Pl. All Rights Reserved.
+
+# Copyright 2026 D-o-M-Pl
+# Licensed under the Apache License, Version 2.0.
 
 [CmdletBinding()]
 param(

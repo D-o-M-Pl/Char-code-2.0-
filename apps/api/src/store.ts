@@ -1,7 +1,18 @@
 // Copyright (c) 2026 D-o-M-Pl. All Rights Reserved.
 
-/**
- *
+import { randomUUID } from "node:crypto";
+import type {
+  AuditEvent,
+  Membership,
+  OutboxEvent,
+  PasswordReset,
+  RecoveryCode,
+  Session,
+  Task,
+  User
+} from "./types.js";
+import { hash, passwordHash, secureToken, verifyPassword } from "./security.js";
+
 export interface Store {
   authenticate(email: string, password: string): Promise<Session | null>;
   resolveSession(token: string): Promise<User | null>;

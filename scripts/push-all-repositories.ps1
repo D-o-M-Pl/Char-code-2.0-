@@ -1,4 +1,7 @@
-// Copyright (c) 2026 D-o-M-Pl. All Rights Reserved.
+# Copyright (c) 2026 D-o-M-Pl. All Rights Reserved.
+
+# Copyright 2026 D-o-M-Pl
+# Licensed under the Apache License, Version 2.0.
 
 [CmdletBinding()]
 param(
@@ -52,7 +55,7 @@ foreach ($repo in ($repositories | Sort-Object -Unique)) {
         if ($LASTEXITCODE -ne 0) { throw "git status failed." }
 
         if ($DryRun) {
-            Write-Host "DRY RUN $repo :: switch $Branch â†’ add â†’ commit -s â†’ push"
+            Write-Host "DRY RUN $repo :: switch $Branch Ôćĺ add Ôćĺ commit -s Ôćĺ push"
             continue
         }
 

@@ -1,7 +1,7 @@
 // Copyright (c) 2026 D-o-M-Pl. All Rights Reserved.
 
-/**
- *
+export type Role = "VOLUNTEER" | "ORGANIZATION_ADMIN" | "PLATFORM_ADMIN" | "SUPPORT";
+
 export interface User {
   id: string;
   email: string;

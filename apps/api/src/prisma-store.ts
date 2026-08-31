@@ -1,7 +1,10 @@
 // Copyright (c) 2026 D-o-M-Pl. All Rights Reserved.
 
-/**
- *
+import { PrismaClient } from "@prisma/client";
+import type { Session, Task, User } from "./types.js";
+import type { Store } from "./store.js";
+import { hash, secureToken, verifyPassword } from "./security.js";
+
 interface PrismaUserShape {
   id: string;
   email: string;

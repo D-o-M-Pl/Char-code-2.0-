@@ -1,7 +1,8 @@
 // Copyright (c) 2026 D-o-M-Pl. All Rights Reserved.
 
-/**
- *
+import type { IncomingMessage, ServerResponse } from "node:http";
+import { randomUUID } from "node:crypto";
+
 export interface JsonRequest<T = unknown> {
   body: T;
   correlationId: string;
