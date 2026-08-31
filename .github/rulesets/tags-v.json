@@ -8,7 +8,9 @@
       "include": [
         "refs/tags/v*"
       ],
-      "exclude": []
+      "exclude": [
+        "refs/tags/v*-rc.*"
+      ]
     }
   },
   "rules": [

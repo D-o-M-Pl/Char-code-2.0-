@@ -1,9 +1,7 @@
 name: Windows Authenticode Signing
 
 on:
-  push:
-    tags:
-      - "v*"
+  workflow_call:
   workflow_dispatch:
 
 permissions:
@@ -18,7 +16,10 @@ jobs:
     timeout-minutes: 40
 
     steps:
-      - uses: actions/checkout@v5
+      - name: Checkout repository
+        uses: actions/checkout@v5
+        with:
+          persist-credentials: false
 
       - name: Install WiX
         shell: pwsh
@@ -30,7 +31,18 @@ jobs:
 
       - name: Build EXE and MSI
         shell: pwsh
-        run: .\installers\build-installer.ps1 -Target all
+        run: |
+          $ErrorActionPreference = "Stop"
+          .\installers\build-installer.ps1 -Target all
+
+          $files = @(
+              Get-ChildItem installers\output\*.exe, installers\output\*.msi `
+                  -ErrorAction SilentlyContinue
+          )
+
+          if ($files.Count -eq 0) {
+              throw "No Windows artifacts were generated."
+          }
 
       - name: Azure login with OIDC
         uses: azure/login@v3
@@ -39,7 +51,7 @@ jobs:
           tenant-id: ${{ vars.AZURE_TENANT_ID }}
           subscription-id: ${{ vars.AZURE_SUBSCRIPTION_ID }}
 
-      - name: Authenticode sign with Azure Artifact Signing
+      - name: Authenticode sign final Windows artifacts
         uses: azure/artifact-signing-action@v2
         with:
           endpoint: ${{ vars.AZURE_ARTIFACT_SIGNING_ENDPOINT }}
@@ -54,45 +66,86 @@ jobs:
       - name: Verify Authenticode signatures
         shell: pwsh
         run: |
-          $files = Get-ChildItem installers\output\*.exe, installers\output\*.msi
+          $ErrorActionPreference = "Stop"
+
+          $files = @(
+              Get-ChildItem installers\output\*.exe, installers\output\*.msi `
+                  -ErrorAction SilentlyContinue
+          )
+
           if ($files.Count -eq 0) {
-            throw "No Windows artifacts found."
+              throw "No Windows artifacts found."
           }
 
           foreach ($file in $files) {
-            $signature = Get-AuthenticodeSignature $file.FullName
+              $signature = Get-AuthenticodeSignature $file.FullName
 
-            if ($signature.Status -ne "Valid") {
-              throw "Invalid Authenticode signature for $($file.Name): $($signature.Status)"
-            }
+              if ($signature.Status -ne "Valid") {
+                  throw "Invalid Authenticode signature for $($file.Name): $($signature.Status)"
+              }
 
-            Write-Host "$($file.Name): $($signature.Status) / $($signature.SignerCertificate.Subject)"
+              Write-Host "$($file.Name): $($signature.Status) / $($signature.SignerCertificate.Subject)"
           }
 
-      - name: Generate SHA-256 manifest
+      - name: Install Cosign
+        uses: sigstore/cosign-installer@v3
+
+      - name: Sign final Authenticode bytes with Sigstore
         shell: pwsh
         run: |
-          $lines = Get-ChildItem installers\output\*.exe, installers\output\*.msi |
-            Sort-Object Name |
-            ForEach-Object {
-              $digest = (Get-FileHash $_.FullName -Algorithm SHA256).Hash.ToLowerInvariant()
-              "$digest  $($_.Name)"
-            }
+          $ErrorActionPreference = "Stop"
 
-          $lines | Set-Content installers\output\SHA256SUMS-WINDOWS.txt
+          $files = @(
+              Get-ChildItem installers\output\*.exe, installers\output\*.msi `
+                  -ErrorAction Stop
+          )
 
-      - name: Attest Authenticode-signed files
+          foreach ($file in $files) {
+              $bundle = "$($file.FullName).sigstore.json"
+              & cosign sign-blob --yes --bundle $bundle $file.FullName
+
+              if ($LASTEXITCODE -ne 0) {
+                  throw "Cosign signing failed for $($file.Name)."
+              }
+
+              if (-not (Test-Path $bundle)) {
+                  throw "Sigstore bundle was not generated for $($file.Name)."
+              }
+          }
+
+      - name: Generate Windows SHA-256 manifest
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = "Stop"
+
+          $files = @(
+              Get-ChildItem installers\output\*.exe, installers\output\*.msi `
+                  -ErrorAction Stop |
+                  Sort-Object Name
+          )
+
+          $lines = foreach ($file in $files) {
+              $digest = (Get-FileHash $file.FullName -Algorithm SHA256).Hash.ToLowerInvariant()
+              "$digest  $($file.Name)"
+          }
+
+          $lines | Set-Content installers\output\SHA256SUMS-WINDOWS.txt -Encoding ascii
+
+      - name: Attest final Authenticode-signed files
         uses: actions/attest-build-provenance@v2
         with:
           subject-path: |
             installers/output/*.exe
             installers/output/*.msi
 
-      - name: Upload Authenticode-signed artifacts
+      - name: Upload final Windows release artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: windows-authenticode
+          name: release-windows
           path: |
             installers/output/*.exe
             installers/output/*.msi
+            installers/output/*.sigstore.json
             installers/output/SHA256SUMS-WINDOWS.txt
+          if-no-files-found: error
+          retention-days: 7
