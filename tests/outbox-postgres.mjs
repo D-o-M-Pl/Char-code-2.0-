@@ -1,3 +1,5 @@
+// Copyright (c) 2026 D-o-M-Pl. All Rights Reserved.
+
 import assert from "node:assert/strict";
 import { randomUUID } from "node:crypto";
 import { PrismaClient } from "@prisma/client";

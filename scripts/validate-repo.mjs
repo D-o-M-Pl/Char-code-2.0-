@@ -1,3 +1,5 @@
+// Copyright (c) 2026 D-o-M-Pl. All Rights Reserved.
+
 import fs from "node:fs";
 import path from "node:path";
 

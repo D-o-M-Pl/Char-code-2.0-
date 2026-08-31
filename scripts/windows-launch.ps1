@@ -1,24 +1,6 @@
-# Copyright 2026 D-o-M-Pl
-#
-# Licensed under the Apache License, Version 2.0 (the "License");
-# you may not use this file except in compliance with the License.
-# You may obtain a copy of the License at
-#
-#     http://www.apache.org/licenses/LICENSE-2.0
-#
-# Unless required by applicable law or agreed to in writing, software
-# distributed under the License is distributed on an "AS IS" BASIS,
-# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-# See the License for the specific language governing permissions and
-# limitations under the License.
-[CmdletBinding()]
-param(
-  [ValidateSet("auto", "local", "web", "audit")]
-  [string]$Mode = "auto",
-  [string]$HostedUrl = $env:CHAR_CODE_HOSTED_URL,
-  [switch]$Build
-)
+// Copyright (c) 2026 D-o-M-Pl. All Rights Reserved.
 
+#
 $ErrorActionPreference = "Stop"
 $RepoRoot = Split-Path -Parent $PSScriptRoot
 
@@ -42,7 +24,7 @@ if ($Mode -eq "audit") {
   Write-Host "Node: $(Has node)"
   Write-Host "WSL: $(Has wsl.exe)"
   Write-Host "Docker: $(Has docker)"
-  Write-Host "Tryb Web/PWA: dostępny"
+  Write-Host "Tryb Web/PWA: dostÄ™pny"
   exit 0
 }
 
@@ -52,14 +34,14 @@ function Open-Web {
   }
   $uri = [Uri]$HostedUrl
   if ($uri.Scheme -ne "https" -and $uri.Host -notin @("localhost","127.0.0.1")) {
-    throw "Wersja hostowana musi używać HTTPS."
+    throw "Wersja hostowana musi uĹĽywaÄ‡ HTTPS."
   }
   Start-Process $HostedUrl
 }
 
 function Start-Local {
   if (-not $is64) {
-    throw "Windows x86 używa wyłącznie wersji Web/PWA."
+    throw "Windows x86 uĹĽywa wyĹ‚Ä…cznie wersji Web/PWA."
   }
   if (-not (Has docker)) {
     throw "Brak Docker Desktop."

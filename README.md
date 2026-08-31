@@ -47,12 +47,14 @@ The installer intentionally installs the launcher/configuration layer. The Windo
 
 ## License
 
-Copyright 2026 D-o-M-Pl.
+Copyright (c) 2026 D-o-M-Pl. All Rights Reserved.
 
-Licensed under the Apache License, Version 2.0. See `LICENSE` and `NOTICE`.
+This repository is proprietary. No license is granted to use, copy,
+modify, redistribute, sublicense, or commercially exploit the original
+project materials without prior written permission from the copyright
+holder.
 
-The Apache License grants broad permissions to use, modify, and distribute the software subject to its terms. Trademark and branding rights are not granted by the license.
-
+Third-party dependencies remain subject to their own licenses.
 ## Contributing
 
 See:

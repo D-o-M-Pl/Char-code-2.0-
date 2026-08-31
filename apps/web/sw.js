@@ -1,3 +1,5 @@
+// Copyright (c) 2026 D-o-M-Pl. All Rights Reserved.
+
 const CACHE = "char-code-2-shell-v1";
 const SHELL = ["/", "/app.js", "/manifest.webmanifest"];
 self.addEventListener("install", event => event.waitUntil(caches.open(CACHE).then(cache => cache.addAll(SHELL))));

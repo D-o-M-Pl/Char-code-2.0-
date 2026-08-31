@@ -1,3 +1,5 @@
+// Copyright (c) 2026 D-o-M-Pl. All Rights Reserved.
+
 import assert from "node:assert/strict";
 
 const baseUrl = (process.env.SMOKE_BASE_URL ?? "").replace(/\/+$/, "");

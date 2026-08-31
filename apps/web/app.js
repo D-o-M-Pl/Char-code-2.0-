@@ -1,3 +1,5 @@
+// Copyright (c) 2026 D-o-M-Pl. All Rights Reserved.
+
 let accessToken = "";
 const out = document.getElementById("output");
 

@@ -1,3 +1,5 @@
+// Copyright (c) 2026 D-o-M-Pl. All Rights Reserved.
+
 import { randomUUID } from "node:crypto";
 import { PrismaClient } from "@prisma/client";
 
@@ -41,7 +43,7 @@ async function dispatch(event: any) {
       outboxEventId: event.id,
       userId: payload.userId ?? null,
       recipient: payload.email,
-      subject: "Char-code — reset hasła",
+      subject: "Char-code â€” reset hasĹ‚a",
       body: `Token resetu: ${payload.token}`,
       status: "PENDING",
     },
