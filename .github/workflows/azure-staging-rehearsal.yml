@@ -1,0 +1,319 @@
+name: Azure Staging Rehearsal
+
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Signed release tag to deploy, e.g. v2.0.0-rc.1
+        required: true
+        type: string
+      exercise_rollback:
+        description: Restore the previous staging images after successful smoke tests
+        required: true
+        default: true
+        type: boolean
+
+permissions:
+  contents: read
+  packages: read
+  id-token: write
+
+concurrency:
+  group: char-code-staging
+  cancel-in-progress: false
+
+jobs:
+  verify-images:
+    name: Verify Staging Images
+    runs-on: ubuntu-latest
+    outputs:
+      api_image: ${{ steps.images.outputs.api_image }}
+      web_image: ${{ steps.images.outputs.web_image }}
+
+    steps:
+      - name: Install Cosign
+        uses: sigstore/cosign-installer@v3
+
+      - name: Login to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ github.token }}
+
+      - name: Resolve immutable image digests and verify signatures
+        id: images
+        env:
+          TAG: ${{ inputs.tag }}
+        shell: bash
+        run: |
+          repo="${GITHUB_REPOSITORY,,}"
+          repo="${repo%-}"
+
+          for component in api web; do
+            tagged="ghcr.io/${repo}/${component}:${TAG}"
+            digest="$(docker buildx imagetools inspect "$tagged" --format '{{json .Manifest.Digest}}' | tr -d '"')"
+            test -n "$digest"
+
+            image="ghcr.io/${repo}/${component}@${digest}"
+
+            cosign verify \
+              --certificate-identity-regexp "^https://github.com/${GITHUB_REPOSITORY}/.github/workflows/sign-containers.yml@" \
+              --certificate-oidc-issuer "https://token.actions.githubusercontent.com" \
+              "$image"
+
+            echo "${component}_image=$image" >> "$GITHUB_OUTPUT"
+          done
+
+  deploy:
+    name: Deploy, Smoke, and Rollback Staging
+    needs: verify-images
+    runs-on: ubuntu-latest
+    environment: staging
+    timeout-minutes: 45
+
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version: "22"
+
+      - name: Azure login with OIDC
+        uses: azure/login@v3
+        with:
+          client-id: ${{ vars.AZURE_STAGING_CLIENT_ID }}
+          tenant-id: ${{ vars.AZURE_TENANT_ID }}
+          subscription-id: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+
+      - name: Ensure staging slots exist
+        shell: bash
+        env:
+          RG: ${{ vars.AZURE_RESOURCE_GROUP }}
+          API_APP: ${{ vars.AZURE_API_APP_NAME }}
+          WEB_APP: ${{ vars.AZURE_WEB_APP_NAME }}
+        run: |
+          for app in "$API_APP" "$WEB_APP"; do
+            if ! az webapp deployment slot list \
+              --resource-group "$RG" \
+              --name "$app" \
+              --query "[?name=='staging'].name | [0]" \
+              --output tsv | grep -qx staging; then
+              az webapp deployment slot create \
+                --resource-group "$RG" \
+                --name "$app" \
+                --slot staging
+            fi
+          done
+
+      - name: Capture previous staging images
+        id: previous
+        shell: bash
+        env:
+          RG: ${{ vars.AZURE_RESOURCE_GROUP }}
+          API_APP: ${{ vars.AZURE_API_APP_NAME }}
+          WEB_APP: ${{ vars.AZURE_WEB_APP_NAME }}
+        run: |
+          read_image() {
+            local app="$1"
+            local raw
+            raw="$(az webapp config show \
+              --resource-group "$RG" \
+              --name "$app" \
+              --slot staging \
+              --query linuxFxVersion \
+              --output tsv || true)"
+            echo "${raw#DOCKER|}"
+          }
+
+          previous_api="$(read_image "$API_APP")"
+          previous_web="$(read_image "$WEB_APP")"
+
+          echo "previous_api=$previous_api" >> "$GITHUB_OUTPUT"
+          echo "previous_web=$previous_web" >> "$GITHUB_OUTPUT"
+
+      - name: Configure staging slot settings
+        shell: bash
+        env:
+          RG: ${{ vars.AZURE_RESOURCE_GROUP }}
+          API_APP: ${{ vars.AZURE_API_APP_NAME }}
+          WEB_APP: ${{ vars.AZURE_WEB_APP_NAME }}
+        run: |
+          api_slot_host="https://${API_APP}-staging.azurewebsites.net"
+
+          az webapp config appsettings set \
+            --resource-group "$RG" \
+            --name "$API_APP" \
+            --slot staging \
+            --settings \
+              HOST=0.0.0.0 \
+              PORT=3001 \
+              WEBSITES_PORT=3001 \
+              DATABASE_MODE=memory
+
+          az webapp config appsettings set \
+            --resource-group "$RG" \
+            --name "$WEB_APP" \
+            --slot staging \
+            --slot-settings \
+              WEBSITES_PORT=3000 \
+              API_UPSTREAM="$api_slot_host"
+
+      - name: Allow staging smoke traffic
+        shell: bash
+        env:
+          RG: ${{ vars.AZURE_RESOURCE_GROUP }}
+          WEB_APP: ${{ vars.AZURE_WEB_APP_NAME }}
+        run: |
+          az webapp config access-restriction set \
+            --resource-group "$RG" \
+            --name "$WEB_APP" \
+            --slot staging \
+            --default-action Allow \
+            --scm-default-action Deny
+
+      - name: Deploy immutable images to staging slots
+        shell: bash
+        env:
+          RG: ${{ vars.AZURE_RESOURCE_GROUP }}
+          API_APP: ${{ vars.AZURE_API_APP_NAME }}
+          WEB_APP: ${{ vars.AZURE_WEB_APP_NAME }}
+          API_IMAGE: ${{ needs.verify-images.outputs.api_image }}
+          WEB_IMAGE: ${{ needs.verify-images.outputs.web_image }}
+          REGISTRY_USER: ${{ secrets.GHCR_PULL_USERNAME }}
+          REGISTRY_TOKEN: ${{ secrets.GHCR_PULL_TOKEN }}
+        run: |
+          for spec in \
+            "$API_APP|$API_IMAGE" \
+            "$WEB_APP|$WEB_IMAGE"; do
+            app="${spec%%|*}"
+            image="${spec#*|}"
+
+            az webapp config container set \
+              --resource-group "$RG" \
+              --name "$app" \
+              --slot staging \
+              --container-image-name "$image" \
+              --container-registry-url "https://ghcr.io" \
+              --container-registry-user "$REGISTRY_USER" \
+              --container-registry-password "$REGISTRY_TOKEN"
+
+            az webapp restart \
+              --resource-group "$RG" \
+              --name "$app" \
+              --slot staging
+          done
+
+      - name: Smoke test staging
+        id: smoke
+        env:
+          SMOKE_BASE_URL: https://${{ vars.AZURE_WEB_APP_NAME }}-staging.azurewebsites.net
+          SMOKE_EMAIL: ${{ secrets.STAGING_SMOKE_EMAIL }}
+          SMOKE_PASSWORD: ${{ secrets.STAGING_SMOKE_PASSWORD }}
+          SMOKE_OWN_TENANT: ${{ vars.STAGING_SMOKE_OWN_TENANT }}
+          SMOKE_FOREIGN_TENANT: ${{ vars.STAGING_SMOKE_FOREIGN_TENANT }}
+        run: node scripts/smoke-test.mjs
+
+      - name: Automatic rollback after failed deployment or smoke test
+        if: failure() && steps.previous.outcome == 'success'
+        shell: bash
+        env:
+          RG: ${{ vars.AZURE_RESOURCE_GROUP }}
+          API_APP: ${{ vars.AZURE_API_APP_NAME }}
+          WEB_APP: ${{ vars.AZURE_WEB_APP_NAME }}
+          PREVIOUS_API: ${{ steps.previous.outputs.previous_api }}
+          PREVIOUS_WEB: ${{ steps.previous.outputs.previous_web }}
+          REGISTRY_USER: ${{ secrets.GHCR_PULL_USERNAME }}
+          REGISTRY_TOKEN: ${{ secrets.GHCR_PULL_TOKEN }}
+        run: |
+          rollback() {
+            local app="$1"
+            local image="$2"
+            if [ -z "$image" ]; then
+              echo "No previous image recorded for $app; skipping image rollback."
+              return
+            fi
+
+            az webapp config container set \
+              --resource-group "$RG" \
+              --name "$app" \
+              --slot staging \
+              --container-image-name "$image" \
+              --container-registry-url "https://ghcr.io" \
+              --container-registry-user "$REGISTRY_USER" \
+              --container-registry-password "$REGISTRY_TOKEN"
+
+            az webapp restart \
+              --resource-group "$RG" \
+              --name "$app" \
+              --slot staging
+          }
+
+          rollback "$API_APP" "$PREVIOUS_API"
+          rollback "$WEB_APP" "$PREVIOUS_WEB"
+
+      - name: Exercise rollback path
+        if: success() && inputs.exercise_rollback
+        shell: bash
+        env:
+          RG: ${{ vars.AZURE_RESOURCE_GROUP }}
+          API_APP: ${{ vars.AZURE_API_APP_NAME }}
+          WEB_APP: ${{ vars.AZURE_WEB_APP_NAME }}
+          PREVIOUS_API: ${{ steps.previous.outputs.previous_api }}
+          PREVIOUS_WEB: ${{ steps.previous.outputs.previous_web }}
+          REGISTRY_USER: ${{ secrets.GHCR_PULL_USERNAME }}
+          REGISTRY_TOKEN: ${{ secrets.GHCR_PULL_TOKEN }}
+        run: |
+          if [ -z "$PREVIOUS_API" ] || [ -z "$PREVIOUS_WEB" ]; then
+            echo "Rollback rehearsal requires a previous staging baseline."
+            exit 1
+          fi
+
+          for spec in \
+            "$API_APP|$PREVIOUS_API" \
+            "$WEB_APP|$PREVIOUS_WEB"; do
+            app="${spec%%|*}"
+            image="${spec#*|}"
+
+            az webapp config container set \
+              --resource-group "$RG" \
+              --name "$app" \
+              --slot staging \
+              --container-image-name "$image" \
+              --container-registry-url "https://ghcr.io" \
+              --container-registry-user "$REGISTRY_USER" \
+              --container-registry-password "$REGISTRY_TOKEN"
+
+            az webapp restart \
+              --resource-group "$RG" \
+              --name "$app" \
+              --slot staging
+          done
+
+      - name: Verify rollback baseline
+        if: success() && inputs.exercise_rollback
+        env:
+          SMOKE_BASE_URL: https://${{ vars.AZURE_WEB_APP_NAME }}-staging.azurewebsites.net
+          SMOKE_EMAIL: ${{ secrets.STAGING_SMOKE_EMAIL }}
+          SMOKE_PASSWORD: ${{ secrets.STAGING_SMOKE_PASSWORD }}
+          SMOKE_OWN_TENANT: ${{ vars.STAGING_SMOKE_OWN_TENANT }}
+          SMOKE_FOREIGN_TENANT: ${{ vars.STAGING_SMOKE_FOREIGN_TENANT }}
+        run: node scripts/smoke-test.mjs
+
+      - name: Staging rehearsal summary
+        if: always()
+        shell: bash
+        env:
+          TAG: ${{ inputs.tag }}
+          API_IMAGE: ${{ needs.verify-images.outputs.api_image }}
+          WEB_IMAGE: ${{ needs.verify-images.outputs.web_image }}
+          EXERCISE_ROLLBACK: ${{ inputs.exercise_rollback }}
+        run: |
+          {
+            echo "## Staging rehearsal"
+            echo ""
+            echo "- Release: \`$TAG\`"
+            echo "- API candidate: \`$API_IMAGE\`"
+            echo "- Web candidate: \`$WEB_IMAGE\`"
+            echo "- Rollback exercise requested: \`$EXERCISE_ROLLBACK\`"
+          } >> "$GITHUB_STEP_SUMMARY"

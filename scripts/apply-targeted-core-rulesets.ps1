@@ -1,4 +1,4 @@
-ã~}sV¼å®[mº{Ïuç†ÜÑæús¶º÷‡^ó­# Copyright (c) 2026 D-o-M-Pl. All Rights Reserved.
+# Copyright (c) 2026 D-o-M-Pl. All Rights Reserved.
 
 [CmdletBinding()]
 param(

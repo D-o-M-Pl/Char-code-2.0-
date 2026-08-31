@@ -1,0 +1,80 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1500" height="920" viewBox="0 0 1500 920" role="img" aria-labelledby="title desc">
+<title id="title">Char-code 2.0 Verified Release Supply Chain</title>
+<desc id="desc">Source tag passes CI, builds containers and Windows installers, creates checksums, Sigstore signatures, SBOM and SLSA provenance before GitHub Release.</desc>
+<defs>
+  <marker id="arrow" markerWidth="10" markerHeight="10" refX="8" refY="5" orient="auto">
+    <path d="M0 0 L10 5 L0 10 Z" fill="#334155"/>
+  </marker>
+  <filter id="shadow"><feDropShadow dx="0" dy="6" stdDeviation="7" flood-color="#0f172a" flood-opacity=".16"/></filter>
+  <style>
+    .bg{fill:#f8fafc}.box{fill:#fff;stroke:#64748b;stroke-width:2;rx:18;filter:url(#shadow)}
+    .blue{fill:#eff6ff;stroke:#2563eb;stroke-width:2;rx:18}.green{fill:#ecfdf5;stroke:#059669;stroke-width:2;rx:18}
+    .orange{fill:#fff7ed;stroke:#ea580c;stroke-width:2;rx:18}.purple{fill:#f5f3ff;stroke:#7c3aed;stroke-width:2;rx:18}
+    .title{font:700 34px Arial,sans-serif;fill:#0f172a}.h{font:700 19px Arial,sans-serif;fill:#0f172a}
+    .t{font:500 14px Arial,sans-serif;fill:#334155}.edge{stroke:#334155;stroke-width:2.4;fill:none;marker-end:url(#arrow)}
+  </style>
+</defs>
+<rect class="bg" width="1500" height="920"/>
+<text x="55" y="60" class="title">Char-code 2.0 — Verified Release Supply Chain</text>
+<text x="55" y="92" class="t">Immutable tag → build → integrity metadata → signatures → provenance → release.</text>
+
+<rect x="60" y="145" width="210" height="100" class="box"/>
+<text x="105" y="187" class="h">Git Tag v*</text>
+<text x="105" y="217" class="t">Protected source</text>
+
+<rect x="335" y="145" width="230" height="100" class="blue"/>
+<text x="385" y="187" class="h">CI Gate</text>
+<text x="375" y="217" class="t">Build · E2E · security</text>
+
+<path class="edge" d="M270 195 L335 195"/>
+
+<rect x="655" y="115" width="235" height="115" class="green"/>
+<text x="700" y="158" class="h">Windows Build</text>
+<text x="695" y="190" class="t">EXE + MSI</text>
+
+<rect x="655" y="275" width="235" height="115" class="green"/>
+<text x="700" y="318" class="h">Container Build</text>
+<text x="695" y="350" class="t">API + Web @ digest</text>
+
+<rect x="655" y="435" width="235" height="115" class="blue"/>
+<text x="700" y="478" class="h">Source Bundle</text>
+<text x="695" y="510" class="t">tar.gz</text>
+
+<path class="edge" d="M565 195 C610 195 610 172 655 172"/>
+<path class="edge" d="M565 195 C610 195 610 332 655 332"/>
+<path class="edge" d="M565 195 C600 195 600 492 655 492"/>
+
+<rect x="980" y="95" width="250" height="115" class="orange"/>
+<text x="1028" y="138" class="h">SHA-256</text>
+<text x="1020" y="170" class="t">SHA256SUMS.txt</text>
+
+<rect x="980" y="245" width="250" height="115" class="purple"/>
+<text x="1028" y="288" class="h">Sigstore/Cosign</text>
+<text x="1020" y="320" class="t">OIDC keyless signatures</text>
+
+<rect x="980" y="395" width="250" height="115" class="blue"/>
+<text x="1028" y="438" class="h">GitHub Attestation</text>
+<text x="1020" y="470" class="t">signed build provenance</text>
+
+<rect x="980" y="545" width="250" height="115" class="purple"/>
+<text x="1028" y="588" class="h">SLSA Provenance</text>
+<text x="1020" y="620" class="t">isolated reusable builder</text>
+
+<path class="edge" d="M890 172 L980 152"/>
+<path class="edge" d="M890 172 L980 302"/>
+<path class="edge" d="M890 332 L980 302"/>
+<path class="edge" d="M890 492 L980 452"/>
+<path class="edge" d="M890 492 L980 602"/>
+
+<rect x="560" y="690" width="380" height="115" class="green"/>
+<text x="635" y="735" class="h">Verified GitHub Release</text>
+<text x="615" y="768" class="t">artifacts · SBOM · signatures · checksums · provenance</text>
+
+<path class="edge" d="M1105 210 C1105 680 900 680 850 690"/>
+<path class="edge" d="M1105 360 C1105 655 900 670 830 690"/>
+<path class="edge" d="M1105 510 C1105 640 900 665 810 690"/>
+<path class="edge" d="M1105 660 C1050 690 980 720 940 735"/>
+
+<rect x="280" y="835" width="940" height="50" class="box"/>
+<text x="330" y="867" class="t">Consumer verifies SHA-256 + Sigstore workflow identity + immutable container digest + SLSA/GitHub provenance before trust.</text>
+</svg>

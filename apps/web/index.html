@@ -1,0 +1,39 @@
+<!doctype html>
+<html lang="pl">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="theme-color" content="#0f172a">
+  <link rel="manifest" href="/manifest.webmanifest">
+  <title>Char-code 2.0</title>
+  <style>
+    body{margin:0;font-family:system-ui;background:#f8fafc;color:#0f172a}
+    header{background:#0f172a;color:white;padding:18px 28px}
+    main{max-width:1000px;margin:40px auto;padding:0 24px}
+    .grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:16px}
+    .card{background:white;border-radius:18px;padding:22px;box-shadow:0 8px 25px #0f172a12}
+    input,button{box-sizing:border-box;width:100%;padding:12px;margin-top:8px;border-radius:10px;border:1px solid #cbd5e1}
+    button{background:#0f172a;color:white;font-weight:700;cursor:pointer}
+    pre{white-space:pre-wrap}
+  </style>
+</head>
+<body>
+<header><strong>Char-code 2.0</strong> — Windows / SaaS</header>
+<main>
+  <section class="card">
+    <h1>Logowanie</h1>
+    <input id="email" type="email" value="admin-a@example.test" aria-label="Email">
+    <input id="password" type="password" value="Correct-Horse-2026!" aria-label="Hasło">
+    <button id="login">Zaloguj</button>
+  </section>
+
+  <section class="grid" style="margin-top:18px">
+    <article class="card"><h2>Tenant isolation</h2><button id="own">NGO A</button><button id="other">Próba NGO B</button></article>
+    <article class="card"><h2>RODO / Security</h2><p>Reset hasła, recovery MFA, audyt i sesje są częścią P0 API.</p></article>
+    <article class="card"><h2>Status</h2><button id="health">Health</button></article>
+  </section>
+  <section class="card" style="margin-top:18px"><pre id="output">Gotowy.</pre></section>
+</main>
+<script src="/app.js"></script>
+</body>
+</html>
