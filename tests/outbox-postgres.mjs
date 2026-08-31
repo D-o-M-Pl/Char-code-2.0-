@@ -18,10 +18,10 @@ try{
  assert.equal(new Set([...xa,...ya]).size,20);
  const id=ids[0];
  await Promise.all([a.$queryRawUnsafe(
-   `INSERT INTO notification (outbox_event_id, recipient, subject, body) VALUES ($1, $2, $3, $4) ON CONFLICT (outbox_event_id) DO NOTHING`,
+   `INSERT INTO notifications (outbox_event_id, recipient, subject, body) VALUES ($1, $2, $3, $4) ON CONFLICT (outbox_event_id) DO NOTHING`,
    id,"x@example.test","x","x"),
   b.$queryRawUnsafe(
-   `INSERT INTO notification (outbox_event_id, recipient, subject, body) VALUES ($1, $2, $3, $4) ON CONFLICT (outbox_event_id) DO NOTHING`,
+   `INSERT INTO notifications (outbox_event_id, recipient, subject, body) VALUES ($1, $2, $3, $4) ON CONFLICT (outbox_event_id) DO NOTHING`,
    id,"x@example.test","x","x")]);
  assert.equal(await a.notification.count({where:{outboxEventId:id}}),1);
  console.log("OUTBOX PASS");
