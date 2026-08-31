@@ -1,0 +1,31 @@
+{
+  "name": "char-code-2",
+  "private": true,
+  "version": "2.0.0",
+  "workspaces": [
+    "apps/api"
+  ],
+  "scripts": {
+    "build": "npm run build -w @char-code/api",
+    "typecheck": "npm run typecheck -w @char-code/api",
+    "test:e2e": "node tests/e2e.mjs",
+    "start:api": "npm run start -w @char-code/api",
+    "validate": "npm run prisma:validate && npm run typecheck && npm run build && node scripts/validate-repo.mjs",
+    "prisma:generate": "prisma generate --schema packages/database/prisma/schema.prisma",
+    "prisma:validate": "prisma validate --schema packages/database/prisma/schema.prisma",
+    "db:migrate": "prisma migrate deploy --schema packages/database/prisma/schema.prisma",
+    "test:rls": "node tests/rls-postgres.mjs",
+    "test:security": "npm run test:e2e && npm run test:rls",
+    "test:outbox": "node tests/outbox-postgres.mjs"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "devDependencies": {
+    "prisma": "6.15.0",
+    "typescript": "5.9.2"
+  },
+  "dependencies": {
+    "@prisma/client": "6.15.0"
+  }
+}

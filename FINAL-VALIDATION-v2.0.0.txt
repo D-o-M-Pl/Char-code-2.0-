@@ -1,0 +1,19 @@
+Char-code 2.0 final local validation
+
+PASS - TypeScript typecheck
+PASS - TypeScript build
+PASS - Memory-adapter E2E (auth, tenant isolation, enumeration resistance, metrics)
+PASS - RLS test JavaScript syntax
+PASS - Smoke test JavaScript syntax
+PASS - GitHub Actions / Compose YAML parse
+PASS - Docker static integrity
+PASS - RLS static invariants
+PASS - RC staging/approval/swap/rollback invariants
+PASS - Secret heuristic scan
+PASS - Bicep static security invariants
+
+NOT EXECUTED HERE - PostgreSQL 16 real RLS test (workflow added; no PostgreSQL/Docker locally)
+NOT EXECUTED HERE - Docker image build/runtime
+NOT EXECUTED HERE - Azure Bicep compile/what-if/deploy
+NOT EXECUTED HERE - WiX/Inno/Azure Artifact Signing
+BLOCKER - package-lock.json must be generated and committed in connected trusted environment

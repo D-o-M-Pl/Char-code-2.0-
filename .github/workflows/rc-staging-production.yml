@@ -1,0 +1,384 @@
+name: RC Staging Approval Production
+
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Release candidate tag, e.g. v2.0.0-rc.1
+        required: true
+        default: v2.0.0-rc.1
+        type: string
+
+permissions:
+  contents: read
+  packages: read
+  id-token: write
+
+concurrency:
+  group: char-code-rc-promotion
+  cancel-in-progress: false
+
+jobs:
+  verify:
+    name: Verify Signed RC Images
+    runs-on: ubuntu-latest
+    outputs:
+      api_image: ${{ steps.images.outputs.api_image }}
+      web_image: ${{ steps.images.outputs.web_image }}
+
+    steps:
+      - name: Validate RC tag
+        env:
+          TAG: ${{ inputs.tag }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          [[ "$TAG" =~ ^v2\.0\.0-rc\.[0-9]+$ ]]
+
+      - name: Install Cosign
+        uses: sigstore/cosign-installer@v3
+
+      - name: Login to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ github.token }}
+
+      - name: Resolve immutable images and verify signatures
+        id: images
+        env:
+          TAG: ${{ inputs.tag }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          repo="${GITHUB_REPOSITORY,,}"
+
+          for component in api web; do
+            tagged="ghcr.io/${repo}/${component}:${TAG}"
+            digest="$(docker buildx imagetools inspect "$tagged" --format '{{json .Manifest.Digest}}' | tr -d '"')"
+            test -n "$digest"
+
+            image="ghcr.io/${repo}/${component}@${digest}"
+
+            cosign verify \
+              --certificate-identity-regexp "^https://github.com/${GITHUB_REPOSITORY}/.github/workflows/sign-containers.yml@" \
+              --certificate-oidc-issuer "https://token.actions.githubusercontent.com" \
+              "$image"
+
+            echo "${component}_image=$image" >> "$GITHUB_OUTPUT"
+          done
+
+  stage:
+    name: Deploy RC to Staging Slots
+    needs: verify
+    runs-on: ubuntu-latest
+    environment: staging
+    timeout-minutes: 40
+
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version: "22"
+
+      - name: Azure login
+        uses: azure/login@v3
+        with:
+          client-id: ${{ vars.AZURE_STAGING_CLIENT_ID }}
+          tenant-id: ${{ vars.AZURE_TENANT_ID }}
+          subscription-id: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+
+      - name: Ensure staging slots exist
+        shell: bash
+        env:
+          RG: ${{ vars.AZURE_RESOURCE_GROUP }}
+          API_APP: ${{ vars.AZURE_API_APP_NAME }}
+          WEB_APP: ${{ vars.AZURE_WEB_APP_NAME }}
+        run: |
+          set -euo pipefail
+          for app in "$API_APP" "$WEB_APP"; do
+            slot="$(az webapp deployment slot list \
+              --resource-group "$RG" \
+              --name "$app" \
+              --query "[?name=='staging'].name | [0]" \
+              --output tsv)"
+
+            if [ "$slot" != "staging" ]; then
+              az webapp deployment slot create \
+                --resource-group "$RG" \
+                --name "$app" \
+                --slot staging
+            fi
+          done
+
+      - name: Configure slot-specific settings
+        shell: bash
+        env:
+          RG: ${{ vars.AZURE_RESOURCE_GROUP }}
+          API_APP: ${{ vars.AZURE_API_APP_NAME }}
+          WEB_APP: ${{ vars.AZURE_WEB_APP_NAME }}
+        run: |
+          set -euo pipefail
+          api_staging_url="https://${API_APP}-staging.azurewebsites.net"
+          api_production_url="https://${API_APP}.azurewebsites.net"
+
+          az webapp config appsettings set \
+            --resource-group "$RG" \
+            --name "$API_APP" \
+            --slot staging \
+            --settings NODE_ENV=production \
+            --slot-settings \
+              DATABASE_MODE=prisma \
+              HOST=0.0.0.0 \
+              PORT=3001 \
+              WEBSITES_PORT=3001
+
+          az webapp config appsettings set \
+            --resource-group "$RG" \
+            --name "$WEB_APP" \
+            --slot staging \
+            --slot-settings \
+              WEBSITES_PORT=3000 \
+              API_UPSTREAM="$api_staging_url"
+
+          az webapp config appsettings set \
+            --resource-group "$RG" \
+            --name "$WEB_APP" \
+            --slot-settings \
+              WEBSITES_PORT=3000 \
+              API_UPSTREAM="$api_production_url"
+
+      - name: Verify database URLs are sticky slot settings
+        shell: bash
+        env:
+          RG: ${{ vars.AZURE_RESOURCE_GROUP }}
+          API_APP: ${{ vars.AZURE_API_APP_NAME }}
+        run: |
+          set -euo pipefail
+
+          production_sticky="$(az webapp config appsettings list \
+            --resource-group "$RG" \
+            --name "$API_APP" \
+            --query "[?name=='DATABASE_URL'].slotSetting | [0]" \
+            --output tsv)"
+
+          staging_sticky="$(az webapp config appsettings list \
+            --resource-group "$RG" \
+            --name "$API_APP" \
+            --slot staging \
+            --query "[?name=='DATABASE_URL'].slotSetting | [0]" \
+            --output tsv)"
+
+          test "$production_sticky" = "true"
+          test "$staging_sticky" = "true"
+
+      - name: Allow direct Web staging smoke traffic
+        shell: bash
+        env:
+          RG: ${{ vars.AZURE_RESOURCE_GROUP }}
+          WEB_APP: ${{ vars.AZURE_WEB_APP_NAME }}
+        run: |
+          set -euo pipefail
+          az webapp config access-restriction set \
+            --resource-group "$RG" \
+            --name "$WEB_APP" \
+            --slot staging \
+            --default-action Allow \
+            --scm-default-action Deny
+
+      - name: Deploy immutable API and Web images
+        shell: bash
+        env:
+          RG: ${{ vars.AZURE_RESOURCE_GROUP }}
+          API_APP: ${{ vars.AZURE_API_APP_NAME }}
+          WEB_APP: ${{ vars.AZURE_WEB_APP_NAME }}
+          API_IMAGE: ${{ needs.verify.outputs.api_image }}
+          WEB_IMAGE: ${{ needs.verify.outputs.web_image }}
+          REGISTRY_USER: ${{ secrets.GHCR_PULL_USERNAME }}
+          REGISTRY_TOKEN: ${{ secrets.GHCR_PULL_TOKEN }}
+        run: |
+          set -euo pipefail
+
+          for spec in \
+            "$API_APP|$API_IMAGE" \
+            "$WEB_APP|$WEB_IMAGE"; do
+            app="${spec%%|*}"
+            image="${spec#*|}"
+
+            az webapp config container set \
+              --resource-group "$RG" \
+              --name "$app" \
+              --slot staging \
+              --container-image-name "$image" \
+              --container-registry-url "https://ghcr.io" \
+              --container-registry-user "$REGISTRY_USER" \
+              --container-registry-password "$REGISTRY_TOKEN"
+
+            az webapp restart \
+              --resource-group "$RG" \
+              --name "$app" \
+              --slot staging
+          done
+
+      - name: Smoke staging
+        env:
+          SMOKE_BASE_URL: https://${{ vars.AZURE_WEB_APP_NAME }}-staging.azurewebsites.net
+          SMOKE_EMAIL: ${{ secrets.STAGING_SMOKE_EMAIL }}
+          SMOKE_PASSWORD: ${{ secrets.STAGING_SMOKE_PASSWORD }}
+          SMOKE_OWN_TENANT: ${{ vars.STAGING_SMOKE_OWN_TENANT }}
+          SMOKE_FOREIGN_TENANT: ${{ vars.STAGING_SMOKE_FOREIGN_TENANT }}
+        run: node scripts/smoke-test.mjs
+
+  approve:
+    name: Production Approval
+    needs: [verify, stage]
+    runs-on: ubuntu-latest
+    environment: production-approval
+
+    steps:
+      - name: Approved immutable candidate
+        env:
+          TAG: ${{ inputs.tag }}
+          API_IMAGE: ${{ needs.verify.outputs.api_image }}
+          WEB_IMAGE: ${{ needs.verify.outputs.web_image }}
+        run: |
+          echo "RC: $TAG"
+          echo "API: $API_IMAGE"
+          echo "Web: $WEB_IMAGE"
+
+  promote:
+    name: Swap Staging to Production
+    needs: [verify, approve]
+    runs-on: ubuntu-latest
+    environment: production
+    timeout-minutes: 40
+
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version: "22"
+
+      - name: Azure login
+        uses: azure/login@v3
+        with:
+          client-id: ${{ vars.AZURE_DEPLOY_CLIENT_ID }}
+          tenant-id: ${{ vars.AZURE_TENANT_ID }}
+          subscription-id: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+
+      - name: Swap API staging into production
+        id: swap_api
+        shell: bash
+        env:
+          RG: ${{ vars.AZURE_RESOURCE_GROUP }}
+          API_APP: ${{ vars.AZURE_API_APP_NAME }}
+        run: |
+          set -euo pipefail
+          az webapp deployment slot swap \
+            --resource-group "$RG" \
+            --name "$API_APP" \
+            --slot staging \
+            --target-slot production
+
+      - name: Swap Web staging into production
+        id: swap_web
+        shell: bash
+        env:
+          RG: ${{ vars.AZURE_RESOURCE_GROUP }}
+          WEB_APP: ${{ vars.AZURE_WEB_APP_NAME }}
+        run: |
+          set -euo pipefail
+          az webapp deployment slot swap \
+            --resource-group "$RG" \
+            --name "$WEB_APP" \
+            --slot staging \
+            --target-slot production
+
+      - name: Production smoke test
+        id: production_smoke
+        env:
+          SMOKE_BASE_URL: ${{ vars.PRODUCTION_URL }}
+          SMOKE_EMAIL: ${{ secrets.PRODUCTION_SMOKE_EMAIL }}
+          SMOKE_PASSWORD: ${{ secrets.PRODUCTION_SMOKE_PASSWORD }}
+          SMOKE_OWN_TENANT: ${{ vars.PRODUCTION_SMOKE_OWN_TENANT }}
+          SMOKE_FOREIGN_TENANT: ${{ vars.PRODUCTION_SMOKE_FOREIGN_TENANT }}
+        run: node scripts/smoke-test.mjs
+
+      - name: Verify deployed immutable digests
+        id: verify_digests
+        shell: bash
+        env:
+          RG: ${{ vars.AZURE_RESOURCE_GROUP }}
+          API_APP: ${{ vars.AZURE_API_APP_NAME }}
+          WEB_APP: ${{ vars.AZURE_WEB_APP_NAME }}
+          EXPECTED_API: ${{ needs.verify.outputs.api_image }}
+          EXPECTED_WEB: ${{ needs.verify.outputs.web_image }}
+        run: |
+          set -euo pipefail
+
+          api_actual="$(az webapp config show \
+            --resource-group "$RG" \
+            --name "$API_APP" \
+            --query linuxFxVersion \
+            --output tsv)"
+          web_actual="$(az webapp config show \
+            --resource-group "$RG" \
+            --name "$WEB_APP" \
+            --query linuxFxVersion \
+            --output tsv)"
+
+          api_actual="${api_actual#DOCKER|}"
+          web_actual="${web_actual#DOCKER|}"
+
+          test "$api_actual" = "$EXPECTED_API"
+          test "$web_actual" = "$EXPECTED_WEB"
+
+      - name: Reverse swap on production validation failure
+        if: failure() && (steps.swap_api.outcome == 'success' || steps.swap_web.outcome == 'success')
+        shell: bash
+        env:
+          RG: ${{ vars.AZURE_RESOURCE_GROUP }}
+          API_APP: ${{ vars.AZURE_API_APP_NAME }}
+          WEB_APP: ${{ vars.AZURE_WEB_APP_NAME }}
+        run: |
+          set +e
+
+          if [ "${{ steps.swap_web.outcome }}" = "success" ]; then
+            az webapp deployment slot swap \
+              --resource-group "$RG" \
+              --name "$WEB_APP" \
+              --slot staging \
+              --target-slot production
+          fi
+
+          if [ "${{ steps.swap_api.outcome }}" = "success" ]; then
+            az webapp deployment slot swap \
+              --resource-group "$RG" \
+              --name "$API_APP" \
+              --slot staging \
+              --target-slot production
+          fi
+
+          exit 1
+
+      - name: Promotion summary
+        if: success()
+        env:
+          TAG: ${{ inputs.tag }}
+          API_IMAGE: ${{ needs.verify.outputs.api_image }}
+          WEB_IMAGE: ${{ needs.verify.outputs.web_image }}
+        run: |
+          {
+            echo "## Production promotion complete"
+            echo ""
+            echo "- Candidate: \`$TAG\`"
+            echo "- Staging smoke: PASS"
+            echo "- Manual approval: PASS"
+            echo "- Slot swap: PASS"
+            echo "- Production smoke: PASS"
+            echo "- API digest: \`$API_IMAGE\`"
+            echo "- Web digest: \`$WEB_IMAGE\`"
+          } >> "$GITHUB_STEP_SUMMARY"
