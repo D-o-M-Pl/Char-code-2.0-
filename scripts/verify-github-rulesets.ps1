@@ -1,5 +1,4 @@
 # Copyright (c) 2026 D-o-M-Pl. All Rights Reserved.
-
 # Copyright 2026 D-o-M-Pl
 # Licensed under the Apache License, Version 2.0.
 
@@ -26,7 +25,10 @@ function Invoke-GhJson {
     }
 
     $text = ($output -join "`n")
-    if ([string]::IsNullOrWhiteSpace($text)) { return $null }
+    if ([string]::IsNullOrWhiteSpace($text)) {
+        return $null
+    }
+
     return $text | ConvertFrom-Json
 }
 
@@ -36,11 +38,13 @@ function Get-OwnedRepositories {
 
     while ($true) {
         $batch = Invoke-GhJson @(
-            "--method","GET",
+            "--method", "GET",
             "/user/repos?affiliation=owner&per_page=100&page=$page"
         )
 
-        if (-not $batch -or @($batch).Count -eq 0) { break }
+        if (-not $batch -or @($batch).Count -eq 0) {
+            break
+        }
 
         foreach ($repo in @($batch)) {
             if ($repo.owner.login -eq $Owner -and -not $repo.archived) {
@@ -48,7 +52,10 @@ function Get-OwnedRepositories {
             }
         }
 
-        if (@($batch).Count -lt 100) { break }
+        if (@($batch).Count -lt 100) {
+            break
+        }
+
         $page += 1
     }
 
@@ -56,30 +63,42 @@ function Get-OwnedRepositories {
 }
 
 function Get-FullRuleset {
-    param([string]$Repo, [int64]$Id)
+    param(
+        [Parameter(Mandatory)][string]$Repo,
+        [Parameter(Mandatory)][int64]$Id
+    )
 
     return Invoke-GhJson @(
-        "--method","GET",
+        "--method", "GET",
         "/repos/$Owner/$Repo/rulesets/$Id"
     )
 }
 
 function Assert-Ruleset {
     param(
-        [string]$Repo,
-        [object[]]$Summaries,
-        [string]$Name,
-        [string]$Target,
-        [string]$Include,
-        [string[]]$RuleTypes
+        [Parameter(Mandatory)][string]$Repo,
+        [Parameter(Mandatory)][object[]]$Summaries,
+        [Parameter(Mandatory)][string]$Name,
+        [Parameter(Mandatory)][string]$Target,
+        [Parameter(Mandatory)][string]$Include,
+        [string[]]$Excludes = @(),
+        [Parameter(Mandatory)][string[]]$RuleTypes
     )
 
     $summary = @($Summaries) |
-        Where-Object { $_.name -eq $Name -and $_.source_type -eq "Repository" } |
+        Where-Object {
+            $_.name -eq $Name -and
+            $_.source_type -eq "Repository"
+        } |
         Select-Object -First 1
 
-    if (-not $summary) { throw "Missing ruleset '$Name'." }
-    if ($summary.enforcement -ne "active") { throw "Ruleset '$Name' is not active." }
+    if (-not $summary) {
+        throw "Missing ruleset '$Name'."
+    }
+
+    if ($summary.enforcement -ne "active") {
+        throw "Ruleset '$Name' is not active."
+    }
 
     $full = Get-FullRuleset -Repo $Repo -Id $summary.id
 
@@ -87,8 +106,16 @@ function Assert-Ruleset {
         throw "Ruleset '$Name' target '$($full.target)' != '$Target'."
     }
 
-    if (@($full.conditions.ref_name.include) -notcontains $Include) {
+    $actualIncludes = @($full.conditions.ref_name.include)
+    if ($actualIncludes -notcontains $Include) {
         throw "Ruleset '$Name' missing include '$Include'."
+    }
+
+    $actualExcludes = @($full.conditions.ref_name.exclude)
+    foreach ($exclude in $Excludes) {
+        if ($actualExcludes -notcontains $exclude) {
+            throw "Ruleset '$Name' missing exclude '$exclude'."
+        }
     }
 
     $actualTypes = @($full.rules).type
@@ -124,21 +151,54 @@ else {
 }
 
 $expected = @(
-    @{ Name="all-branches-immutable-history"; Target="branch"; Include="~ALL"; Rules=@("deletion","non_fast_forward") },
-    @{ Name="main-production-gate"; Target="branch"; Include="refs/heads/main"; Rules=@("deletion","non_fast_forward","pull_request","required_status_checks") },
-    @{ Name="release-branches-production-gate"; Target="branch"; Include="refs/heads/release/*"; Rules=@("deletion","non_fast_forward","pull_request","required_status_checks") },
-    @{ Name="immutable-version-tags"; Target="tag"; Include="refs/tags/v*"; Rules=@("deletion","update") },
-    @{ Name="immutable-v2.0.0-tag"; Target="tag"; Include="refs/tags/v2.0.0"; Rules=@("deletion","update") }
+    @{
+        Name = "all-branches-immutable-history"
+        Target = "branch"
+        Include = "~ALL"
+        Excludes = @()
+        Rules = @("deletion", "non_fast_forward")
+    },
+    @{
+        Name = "main-production-gate"
+        Target = "branch"
+        Include = "refs/heads/main"
+        Excludes = @()
+        Rules = @("deletion", "non_fast_forward", "pull_request", "required_status_checks")
+    },
+    @{
+        Name = "release-branches-production-gate"
+        Target = "branch"
+        Include = "refs/heads/release/*"
+        Excludes = @()
+        Rules = @("deletion", "non_fast_forward", "pull_request", "required_status_checks")
+    },
+    @{
+        Name = "immutable-version-tags"
+        Target = "tag"
+        Include = "refs/tags/v*"
+        Excludes = @("refs/tags/v*-rc.*")
+        Rules = @("deletion", "update")
+    },
+    @{
+        Name = "immutable-v2.0.0-tag"
+        Target = "tag"
+        Include = "refs/tags/v2.0.0"
+        Excludes = @()
+        Rules = @("deletion", "update")
+    }
 )
 
 $failures = @()
 
 foreach ($repo in ($repositories | Sort-Object -Unique)) {
     try {
-        $null = Invoke-GhJson @("--method","GET","/repos/$Owner/$repo")
+        $null = Invoke-GhJson @(
+            "--method", "GET",
+            "/repos/$Owner/$repo"
+        )
 
         $summaries = Invoke-GhJson @(
-            "--method","GET",
+            "--method", "GET",
             "/repos/$Owner/$repo/rulesets?includes_parents=false&per_page=100"
         )
 
@@ -149,16 +209,17 @@ foreach ($repo in ($repositories | Sort-Object -Unique)) {
                 -Name $item.Name `
                 -Target $item.Target `
                 -Include $item.Include `
+                -Excludes $item.Excludes `
                 -RuleTypes $item.Rules
         }
 
         $mainRules = Invoke-GhJson @(
-            "--method","GET",
+            "--method", "GET",
             "/repos/$Owner/$repo/rules/branches/main"
         )
 
         $mainTypes = @($mainRules).type
-        foreach ($required in @("deletion","non_fast_forward","pull_request","required_status_checks")) {
+        foreach ($required in @("deletion", "non_fast_forward", "pull_request", "required_status_checks")) {
             if ($mainTypes -notcontains $required) {
                 throw "Active main rules missing '$required'."
             }

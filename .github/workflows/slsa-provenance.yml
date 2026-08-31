@@ -1,52 +1,27 @@
 name: SLSA Provenance
 
 on:
-  push:
-    tags:
-      - "v*"
-  workflow_dispatch:
+  workflow_call:
+    inputs:
+      base64-subjects:
+        description: Base64-encoded sha256sum-compatible final artifact subjects
+        required: true
+        type: string
 
-permissions: read-all
+permissions:
+  actions: read
+  id-token: write
+  contents: write
 
 jobs:
-  build:
-    name: Prepare SLSA Subject
-    runs-on: ubuntu-latest
-    outputs:
-      hashes: ${{ steps.hash.outputs.hashes }}
-
-    steps:
-      - uses: actions/checkout@v5
-
-      - name: Package artifact
-        shell: bash
-        run: |
-          mkdir -p dist-slsa
-          tar \
-            --exclude='.git' \
-            --exclude='node_modules' \
-            --exclude='dist-slsa' \
-            -czf "dist-slsa/char-code-source.tar.gz" .
-
-      - name: Generate subject hash
-        id: hash
-        shell: bash
-        run: |
-          echo "hashes=$(sha256sum dist-slsa/char-code-source.tar.gz | base64 -w0)" >> "$GITHUB_OUTPUT"
-
-      - uses: actions/upload-artifact@v4
-        with:
-          name: slsa-subject
-          path: dist-slsa/char-code-source.tar.gz
-          if-no-files-found: error
-
   provenance:
-    needs: [build]
+    name: Generate SLSA Provenance
     permissions:
       actions: read
       id-token: write
       contents: write
     uses: slsa-framework/slsa-github-generator/.github/workflows/generator_generic_slsa3.yml@v2.1.0
     with:
-      base64-subjects: ${{ needs.build.outputs.hashes }}
+      base64-subjects: ${{ inputs.base64-subjects }}
+      provenance-name: release.intoto.jsonl
       upload-assets: true
