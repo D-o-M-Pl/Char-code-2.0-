@@ -75,11 +75,17 @@ if ($Target -in @("all","msi")) {
     throw "WiX Toolset 5 is required to build CharCode.msi."
   }
 
-  & $wix build `
-    (Join-Path $InstallerRoot "wix\Package.wxs") `
-    -o (Join-Path $Output "CharCode.msi")
+  Push-Location (Join-Path $InstallerRoot "wix")
+  try {
+    & $wix build `
+      "Package.wxs" `
+      -o (Join-Path $Output "CharCode.msi")
 
-  if ($LASTEXITCODE -ne 0) {
-    throw "WiX MSI build failed."
+    if ($LASTEXITCODE -ne 0) {
+      throw "WiX MSI build failed."
+    }
+  }
+  finally {
+    Pop-Location
   }
 }

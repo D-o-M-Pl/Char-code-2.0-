@@ -8,6 +8,10 @@ on:
 permissions:
   contents: read
 
+env:
+  DATABASE_URL: postgresql://char_code_release:char_code_release@127.0.0.1:5432/char_code_release
+  MIGRATION_DATABASE_URL: postgresql://char_code_release:char_code_release@127.0.0.1:5432/char_code_release
+
 jobs:
   build-source:
     name: Build Release Artifacts

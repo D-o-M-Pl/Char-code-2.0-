@@ -220,6 +220,7 @@ jobs:
           set -euo pipefail
 
           repo="${GITHUB_REPOSITORY,,}"
+          repo="${repo%-}"
           api_tag="ghcr.io/${repo}/api:${TAG}"
           web_tag="ghcr.io/${repo}/web:${TAG}"
 

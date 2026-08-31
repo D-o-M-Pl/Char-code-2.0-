@@ -53,6 +53,7 @@ jobs:
         run: |
           set -euo pipefail
           repo="${GITHUB_REPOSITORY,,}"
+          repo="${repo%-}"
 
           for component in api web; do
             tagged="ghcr.io/${repo}/${component}:${TAG}"
