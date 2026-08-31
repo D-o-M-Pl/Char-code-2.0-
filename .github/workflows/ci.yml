@@ -8,6 +8,10 @@ on:
 permissions:
   contents: read
 
+env:
+  DATABASE_URL: postgresql://char_code_ci:char_code_ci@127.0.0.1:5432/char_code_ci
+  MIGRATION_DATABASE_URL: postgresql://char_code_ci:char_code_ci@127.0.0.1:5432/char_code_ci
+
 jobs:
   build:
     strategy:
