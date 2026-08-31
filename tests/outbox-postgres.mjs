@@ -17,7 +17,12 @@ try{
  assert.equal(xa.filter(id=>ya.includes(id)).length,0);
  assert.equal(new Set([...xa,...ya]).size,20);
  const id=ids[0];
- await Promise.all([a.notification.upsert({where:{outboxEventId:id},create:{outboxEventId:id,recipient:"x@example.test",subject:"x",body:"x"},update:{}}),b.notification.upsert({where:{outboxEventId:id},create:{outboxEventId:id,recipient:"x@example.test",subject:"x",body:"x"},update:{}})]);
+ await Promise.all([a.$queryRawUnsafe(
+   `INSERT INTO notification (outbox_event_id, recipient, subject, body) VALUES ($1, $2, $3, $4) ON CONFLICT (outbox_event_id) DO NOTHING`,
+   id,"x@example.test","x","x"),
+  b.$queryRawUnsafe(
+   `INSERT INTO notification (outbox_event_id, recipient, subject, body) VALUES ($1, $2, $3, $4) ON CONFLICT (outbox_event_id) DO NOTHING`,
+   id,"x@example.test","x","x")]);
  assert.equal(await a.notification.count({where:{outboxEventId:id}}),1);
  console.log("OUTBOX PASS");
 }finally{await a.notification.deleteMany({where:{outboxEventId:{in:ids}}}).catch(()=>{});await a.outboxEvent.deleteMany({where:{id:{in:ids}}}).catch(()=>{});await a.$disconnect();await b.$disconnect();}
