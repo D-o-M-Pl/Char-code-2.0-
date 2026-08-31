@@ -23,7 +23,7 @@ jobs:
 
       - name: Install WiX
         shell: pwsh
-        run: dotnet tool install --global wix
+        run: dotnet tool install --global wix --version 5.*
 
       - name: Install Inno Setup
         shell: pwsh

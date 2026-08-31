@@ -48,6 +48,7 @@ jobs:
         shell: bash
         run: |
           repo="${GITHUB_REPOSITORY,,}"
+          repo="${repo%-}"
 
           for component in api web; do
             tagged="ghcr.io/${repo}/${component}:${TAG}"
