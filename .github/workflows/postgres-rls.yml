@@ -35,7 +35,7 @@ jobs:
       RLS_TEST_PASSWORD: Rls-Test-Only-2026-Runner
 
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v7
 
       - uses: actions/setup-node@v5
         with:
