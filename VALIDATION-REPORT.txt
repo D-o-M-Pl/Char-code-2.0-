@@ -1,0 +1,18 @@
+Char-code 2.0 validation report
+
+PASS - TypeScript noEmit: 
+PASS - TypeScript build: 
+PASS - E2E: E2E PASS: auth, tenant isolation, enumeration resistance, metrics
+PASS - Repo validation: Repository structural validation PASS
+PASS - YAML parse: All Compose/CI YAML files parse.
+PASS - WiX XML: Well-formed XML.
+PASS - Prisma static: Schema braces/models verified; CLI validate requires installed Prisma.
+PASS - Bicep static: Brace balance only; Azure CLI/Bicep compiler unavailable here.
+
+Not executable in this environment:
+- Docker Compose build: Docker daemon/CLI unavailable.
+- prisma validate/migrate: dependencies cannot be downloaded in this environment.
+- .EXE/.MSI compilation: WiX/Inno Setup Windows toolchain unavailable.
+- Bicep compile/deployment: Azure CLI/Bicep unavailable.
+
+Windows installer workflow is included to build .exe/.msi on windows-latest.

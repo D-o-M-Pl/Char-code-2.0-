@@ -1,0 +1,68 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1400" height="820" viewBox="0 0 1400 820" role="img" aria-labelledby="title desc">
+<title id="title">Char-code 2.0 Contribution and Licensing Flow</title>
+<desc id="desc">Contributor creates code, verifies rights, signs DCO, optionally accepts CLA, passes CI and review, then code is merged under Apache License 2.0.</desc>
+<defs>
+  <marker id="arrow" markerWidth="10" markerHeight="10" refX="8" refY="5" orient="auto">
+    <path d="M0,0 L10,5 L0,10 z" fill="#334155"/>
+  </marker>
+  <filter id="shadow">
+    <feDropShadow dx="0" dy="5" stdDeviation="7" flood-color="#0f172a" flood-opacity=".16"/>
+  </filter>
+  <style>
+    .bg{fill:#f8fafc}
+    .box{fill:white;stroke:#64748b;stroke-width:2;rx:18;filter:url(#shadow)}
+    .good{fill:#ecfdf5;stroke:#059669;stroke-width:2;rx:18}
+    .warn{fill:#fff7ed;stroke:#ea580c;stroke-width:2;rx:18}
+    .title{font:700 34px Arial,sans-serif;fill:#0f172a}
+    .h{font:700 20px Arial,sans-serif;fill:#0f172a}
+    .t{font:500 15px Arial,sans-serif;fill:#334155}
+    .edge{stroke:#334155;stroke-width:2.5;fill:none;marker-end:url(#arrow)}
+  </style>
+</defs>
+
+<rect class="bg" width="1400" height="820"/>
+<text x="60" y="60" class="title">Char-code 2.0 — Contribution &amp; Licensing</text>
+<text x="60" y="92" class="t">Copyright remains with contributors. Contributions are accepted under Apache License 2.0 subject to DCO/CLA rules.</text>
+
+<rect x="70" y="150" width="250" height="110" class="box"/>
+<text x="110" y="190" class="h">1. Contribution</text>
+<text x="110" y="220" class="t">Code, docs, tests, infra</text>
+
+<rect x="390" y="150" width="250" height="110" class="warn"/>
+<text x="430" y="190" class="h">2. Rights check</text>
+<text x="430" y="220" class="t">No secrets / incompatible code</text>
+
+<rect x="710" y="150" width="250" height="110" class="good"/>
+<text x="750" y="190" class="h">3. DCO sign-off</text>
+<text x="750" y="220" class="t">git commit -s</text>
+
+<rect x="1030" y="150" width="250" height="110" class="box"/>
+<text x="1070" y="190" class="h">4. CLA if needed</text>
+<text x="1070" y="220" class="t">Substantial contributions</text>
+
+<path class="edge" d="M320 205 L390 205"/>
+<path class="edge" d="M640 205 L710 205"/>
+<path class="edge" d="M960 205 L1030 205"/>
+
+<rect x="230" y="355" width="300" height="120" class="box"/>
+<text x="275" y="398" class="h">5. CI / Security Gate</text>
+<text x="275" y="430" class="t">Build · E2E · tenant isolation</text>
+
+<rect x="610" y="355" width="300" height="120" class="box"/>
+<text x="660" y="398" class="h">6. Maintainer Review</text>
+<text x="660" y="430" class="t">Security · privacy · licensing</text>
+
+<rect x="990" y="355" width="300" height="120" class="good"/>
+<text x="1045" y="398" class="h">7. Merge</text>
+<text x="1045" y="430" class="t">Apache License 2.0</text>
+
+<path class="edge" d="M1155 260 C1155 310 380 310 380 355"/>
+<path class="edge" d="M530 415 L610 415"/>
+<path class="edge" d="M910 415 L990 415"/>
+
+<rect x="295" y="590" width="810" height="120" class="good"/>
+<text x="360" y="635" class="h">Result</text>
+<text x="360" y="668" class="t">Contributor retains copyright · Project may use/distribute under Apache 2.0 · Trademark rights remain separate</text>
+
+<path class="edge" d="M1140 475 C1140 540 700 540 700 590"/>
+</svg>
